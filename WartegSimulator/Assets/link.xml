@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Link.xml: mencegah IL2CPP melakukan stripping pada tipe yang hanya dipakai
+  lewat reflection (Input System UI module) supaya UI tetap bisa disentuh
+  di build Android. Tanpa ini, tombol UI bisa tidak merespons di APK.
+-->
+<linker>
+  <assembly fullname="Unity.InputSystem" preserve="all" />
+  <assembly fullname="UnityEngine.UI" preserve="all" />
+  <assembly fullname="UnityEngine.UIModule" preserve="all" />
+  <assembly fullname="UnityEngine.IMGUIModule" preserve="all" />
+  <assembly fullname="Assembly-CSharp" preserve="all" />
+</linker>

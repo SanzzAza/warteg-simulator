@@ -1,0 +1,41 @@
+name: 1. Aktivasi Lisensi Unity (jalankan sekali)
+
+# ============================================================================
+#  Workflow ini membuat file lisensi Unity (.ulf) untuk dipakai build di cloud.
+#  Kamu TIDAK perlu install Unity.
+#
+#  Langkah:
+#   1. Tab Actions > "1. Aktivasi Lisensi Unity" > Run workflow
+#   2. Tunggu selesai (±2 menit) > buka run tersebut > Artifacts >
+#      unduh "Unity_v2022.3.62f3.alf"
+#   3. Buka https://license.unity3d.com/manual
+#      - login akun Unity kamu
+#      - upload file .alf tadi
+#      - pilih "Unity Personal / Free" (jika memakai versi gratis)
+#      - download file .ulf yang diberikan
+#   4. Repo > Settings > Secrets and variables > Actions >
+#      New repository secret:
+#         Name : UNITY_LICENSE
+#         Value: (tempel SELURUH isi file .ulf — buka pakai Notepad)
+#   5. Jalankan workflow "2. Build Warteg Simulator (APK + Windows)"
+# ============================================================================
+
+on:
+  workflow_dispatch:
+
+jobs:
+  activation:
+    name: Request Unity activation file
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request manual activation file
+        id: getManualLicenseFile
+        uses: game-ci/unity-request-activation-file@v2
+        with:
+          unityVersion: 2022.3.62f3
+
+      - name: Upload .alf (file aktivasi)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.getManualLicenseFile.outputs.filePath }}
+          path: ${{ steps.getManualLicenseFile.outputs.filePath }}

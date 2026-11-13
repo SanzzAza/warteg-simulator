@@ -1,0 +1,155 @@
+name: Build Warteg Simulator (APK + Windows)
+
+# ============================================================================
+#  Build di cloud GitHub — TANPA install Unity, TANPA file .ulf.
+#  Aktivasi: lisensi Unity Personal ONLINE (UNITY_EMAIL + UNITY_PASSWORD).
+#
+#  Cara pakai: tab Actions > workflow ini > Run workflow.
+#   - Pilih target "windows" kalau ingin cepat (Windows lebih cepat & stabil).
+#   - "all" = Windows lalu Android (berurutan, seat Personal cuma 1).
+#
+#  Catatan hasil uji:
+#   - Android memakai Mono + ARMv7 karena IL2CPP/ARM64 membuat build sangat
+#     lama di runner gratis. Ubah androidBuildType ke "il2cpp" bila perlu.
+#   - Tiap job diberi timeout-minutes agar tidak menggantung berjam-jam.
+# ============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Target build"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - windows
+          - android
+      androidBuildType:
+        description: "Android scripting backend"
+        required: true
+        default: "mono"
+        type: choice
+        options:
+          - mono
+          - il2cpp
+
+concurrency:
+  group: unity-build
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Build Windows-64
+    if: ${{ inputs.target == 'all' || inputs.target == 'windows' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: WartegSimulator/Library
+          key: Library-StandaloneWindows64-${{ hashFiles('WartegSimulator/Packages/manifest.json', 'WartegSimulator/ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: |
+            Library-StandaloneWindows64-
+            Library-
+
+      - name: Build with Unity
+        uses: game-ci/unity-builder@v6.0.0
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: WartegSimulator
+          unityVersion: 2022.3.62f3
+          targetPlatform: StandaloneWindows64
+          buildMethod: Warteg.EditorTools.BuildScript.BuildWindowsCLI
+          allowDirtyBuild: true
+
+      - name: Kumpulkan hasil
+        if: always()
+        run: |
+          set +e
+          mkdir -p build/Windows
+          cp -rv WartegSimulator/Builds/Windows/* build/Windows/ 2>/dev/null
+          cp -rv build/StandaloneWindows64/* build/Windows/ 2>/dev/null
+          ls -lah build/Windows
+
+      - name: Upload Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WartegSimulator-Windows64
+          path: build/Windows/**
+          if-no-files-found: warn
+          retention-days: 30
+
+  android:
+    name: Build Android-APK
+    if: ${{ inputs.target == 'all' || inputs.target == 'android' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Kosongkan disk
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          swap-storage: false
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: WartegSimulator/Library
+          key: Library-Android-${{ hashFiles('WartegSimulator/Packages/manifest.json', 'WartegSimulator/ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: |
+            Library-Android-
+            Library-
+
+      - name: Build with Unity (APK)
+        uses: game-ci/unity-builder@v6.0.0
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: WartegSimulator
+          unityVersion: 2022.3.62f3
+          targetPlatform: Android
+          buildMethod: Warteg.EditorTools.BuildScript.BuildAndroidCLI
+          allowDirtyBuild: true
+          androidExportType: androidPackage
+          # 33 = target SDK bawaan image game-ci (sudah terpasang, tidak perlu
+          # mengunduh platform baru → inilah yang tadi macet di platform 34)
+          androidTargetSdkVersion: 33
+          androidBuildType: ${{ inputs.androidBuildType }}
+          androidArchitectures: ARMv7
+
+      - name: Kumpulkan hasil
+        if: always()
+        run: |
+          set +e
+          mkdir -p build/Android
+          cp -rv WartegSimulator/Builds/Android/* build/Android/ 2>/dev/null
+          cp -rv build/Android/*.apk build/Android/ 2>/dev/null
+          ls -lah build/Android
+
+      - name: Upload Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WartegSimulator-Android-APK
+          path: build/Android/**
+          if-no-files-found: warn
+          retention-days: 30

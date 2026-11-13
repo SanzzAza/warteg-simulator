@@ -1,0 +1,64 @@
+name: 0. Set Email untuk Lisensi (jalankan sekali)
+
+# ============================================================================
+#  Menyimpan email akun Unity kamu sebagai secret UNITY_EMAIL.
+#  Diperlukan oleh game-ci saat build (lisensi Unity terikat ke email).
+#
+#  Cara pakai:
+#   1. Pastikan email GitHub kamu = email akun Unity (atau isi manual di bawah,
+#      buka file ini lewat "Edit" di GitHub dan ganti baris E_MAIL).
+#   2. Tab Actions > "0. Set Email untuk Lisensi" > Run workflow.
+# ============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      unity_email:
+        description: "Email akun Unity (kosongkan untuk memakai email GitHub)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  set-email:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Simpan secret UNITY_EMAIL
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_EMAIL: ${{ inputs.unity_email }}
+          GIT_EMAIL: ${{ github.event.sender.email }}
+        run: |
+          set -euo pipefail
+          E_MAIL="${INPUT_EMAIL:-$GIT_EMAIL}"
+          if [ -z "$E_MAIL" ]; then
+            echo "Email tidak diketahui. Jalankan ulang workflow dan isi kolom unity_email."
+            exit 1
+          fi
+
+          KEY=$(gh api "repos/${{ github.repository }}/actions/secrets/public-key")
+          KEY_ID=$(echo "$KEY" | python3 -c "import json,sys;print(json.load(sys.stdin)['key_id'])")
+          PUB_KEY=$(echo "$KEY" | python3 -c "import json,sys;print(json.load(sys.stdin)['key'])")
+
+          python3 - "$PUB_KEY" "$KEY_ID" "$E_MAIL" <<'PY'
+import base64, json, os, sys, urllib.request
+from nacl import encoding, public
+
+pub_key, key_id, value = sys.argv[1], sys.argv[2], sys.argv[3]
+sealed = public.SealedBox(public.PublicKey(pub_key.encode(), encoding.Base64Encoder()))
+encrypted = base64.b64encode(sealed.encrypt(value.encode())).decode()
+
+repo = os.environ["GITHUB_REPOSITORY"]
+token = os.environ["GH_TOKEN"]
+body = json.dumps({"encrypted_value": encrypted, "key_id": key_id}).encode()
+req = urllib.request.Request(
+    f"https://api.github.com/repos/{repo}/actions/secrets/UNITY_EMAIL",
+    data=body, method="PUT",
+    headers={"Authorization": f"token {token}",
+             "Accept": "application/vnd.github+json",
+             "Content-Type": "application/json"})
+with urllib.request.urlopen(req) as r:
+    print("UNITY_EMAIL tersimpan, http", r.status)
+PY
