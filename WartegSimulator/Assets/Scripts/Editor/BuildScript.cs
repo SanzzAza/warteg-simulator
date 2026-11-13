@@ -76,21 +76,7 @@ namespace Warteg.EditorTools
 
             EditorUserBuildSettings.buildAppBundle = false;
 
-            // Coba IL2CPP + ARM64 (standar Play Store). IL2CPP butuh NDK;
-            // kalau modul NDK belum terpasang, otomatis mundur ke Mono + ARMv7
-            // supaya APK tetap bisa dibangun untuk uji coba di HP.
-            if (TrySetBackend(ScriptingImplementation.IL2CPP, AndroidArchitecture.ARM64))
-            {
-                Debug.Log("[Warteg] Android: mencoba IL2CPP + ARM64...");
-                if (RunBuild(BuildTarget.Android, apk, false)) return true;
-                Debug.LogWarning("[Warteg] Build IL2CPP gagal. Mencoba ulang dengan Mono + ARMv7 " +
-                                 "(butuh Android Build Support tanpa NDK).");
-            }
-            else
-            {
-                Debug.LogWarning("[Warteg] IL2CPP/ARM64 tidak tersedia. Memakai Mono + ARMv7.");
-            }
-
+            // APK uji langsung: Mono/ARMv7, tanpa kompilasi native IL2CPP.
             TrySetBackend(ScriptingImplementation.Mono2x, AndroidArchitecture.ARMv7);
             return RunBuild(BuildTarget.Android, apk, false);
         }
@@ -169,7 +155,7 @@ namespace Warteg.EditorTools
 
             // Android 7.0 (API 24) sesuai syarat minimum Input System/URP 14
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel24;
-            PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevelAuto;
+            PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)33;
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7;
             PlayerSettings.Android.forceInternetPermission = false;
             PlayerSettings.Android.blitType = AndroidBlitType.Always;
